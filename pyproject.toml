@@ -1,7 +1,7 @@
 [project]
 name = "frisquet-api"
 version = "0.1.0"
-description = "Add your description here"
+description = "Python client for the Frisquet API"
 readme = "README.md"
 authors = [
     { name = "markkvdb", email = "github@mvanderbroek.com" }
