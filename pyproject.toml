@@ -1,0 +1,30 @@
+[project]
+name = "frisquet-api"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "markkvdb", email = "github@mvanderbroek.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.28.0",
+    "pydantic>=2.10.3",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.389",
+    "pytest-asyncio>=0.24.0",
+    "pytest>=8.3.4",
+    "ruff>=0.8.1",
+    "python-dotenv>=1.0.1",
+]
+
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
