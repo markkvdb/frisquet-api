@@ -7,6 +7,27 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel
 from typing import AsyncIterator
 
+from frisquet_api.interface import (
+    FrisquetApiInterface,
+    Zone,
+    Mode,
+    ModeChange,
+    HeatingMode,
+)
+
+MODE_TO_VALUE = {Mode.AUTO: 5, Mode.COMFORT: 6, Mode.ECO: 7, Mode.FROST_PROTECTION: 8}
+HEATING_MODE_TO_VALUE = {
+    HeatingMode.COMFORT: 6,
+    HeatingMode.ECO: 7,
+    HeatingMode.FROST_PROTECTION: 8,
+}
+HEATING_MODE_TO_STR = {
+    HeatingMode.COMFORT: "CONS_COMFORT",
+    HeatingMode.ECO: "CONS_RED",
+    HeatingMode.FROST_PROTECTION: "CONS_HG",
+}
+SELECT_TO_VALUE = {ModeChange.UNTIL_NEXT_CHANGE: 5, ModeChange.PERMANENT: 6}
+
 
 class Token(BaseModel):
     """Frisquet API token."""
@@ -24,7 +45,7 @@ async def raise_on_4xx_5xx(response: httpx.Response) -> None:
     response.raise_for_status()
 
 
-class FrisquetClient:
+class FrisquetClient(FrisquetApiInterface):
     """API Client for Frisquet Connect."""
 
     def __init__(self, email: str, password: str, url: str = DEFAULT_API_URL):
@@ -39,6 +60,42 @@ class FrisquetClient:
         self._url = url.rstrip("/")
         self._token: Token | None = None
         self._sites: dict[str, str] | None = None
+
+    async def set_temperature(
+        self, site_id: str, zone: Zone, heating_mode: HeatingMode, temperature: float
+    ) -> None:
+        """Set temperature for a specific zone"""
+        key = _temperature_key(zone, heating_mode)
+        int_temperature = int(temperature * 10)
+        payload = {key: int_temperature}
+        await self._post_values(site_id, payload)
+
+    async def set_mode(
+        self, site_id: str, zone: Zone, change: ModeChange, mode: Mode
+    ) -> None:
+        """Set mode for a specific zone."""
+        # If the mode is auto and the change is until next change, we need to set the mode to permanent
+        if change == ModeChange.UNTIL_NEXT_CHANGE and mode == Mode.AUTO:
+            logger.warning(
+                "Auto mode cannot be set until next change. Setting to permanent instead."
+            )
+            change = ModeChange.PERMANENT
+
+        key, value = _mode_change_payload(zone, change, mode)
+        payload = {key: value}
+        await self._post_values(site_id, payload)
+
+    async def set_boost(self, site_id: str, zone: Zone, on: True) -> None:
+        """Turn boost on and off."""
+        key = f"ACTIVITE_BOOST_Z{zone.value}"
+        payload = {key: 1 if on else 0}
+        await self._post_values(site_id, payload)
+
+    async def get_consumption_data(
+        self, site_id: str, start_date: datetime, end_date: datetime
+    ) -> list[dict]:
+        """Get consumption data for a date range"""
+        ...
 
     @property
     async def token(self) -> str:
@@ -106,34 +163,25 @@ class FrisquetClient:
 
         return resp.json()
 
-    async def get_consumption(self, site_id: str):
-        """Get energy consumption data for a specific site."""
-        token = await self._get_auth_token()
-        url = f"{self.api_url}{site_id}/conso?token={token}&types[]=CHF&types[]=SAN"
-        async with httpx.AsyncClient(
-            event_hooks={"response": [raise_on_4xx_5xx]}
-        ) as client:
-            resp = await client.get(url)
-            return resp.json()
+    async def _post_values(self, site_id: str, values: dict) -> None:
+        """Post values to Frisquet API."""
+        values_dict = [{"cle": key, "valeur": value} for key, value in values.items()]
+        async with self._http_client(authenticated=True) as client:
+            res = await client.post(f"/ordres/{site_id}", json=values_dict)  # noqa: F841
 
-    async def set_zone_temperature(
-        self, site_id: str, zone_id: str, temperature: float
-    ) -> bool:
-        """Set temperature for a specific zone (placeholder for future implementation)."""
-        # TODO: Implement temperature setting
-        raise NotImplementedError("Temperature setting not yet implemented")
-
-    async def set_zone_mode(self, site_id: str, zone_id: str, mode: str) -> bool:
-        """Set mode for a specific zone (placeholder for future implementation)."""
-        # TODO: Implement mode setting
-        raise NotImplementedError("Mode setting not yet implemented")
+        logger.info(f"Set values {values} for site {site_id}")
 
     @asynccontextmanager
     async def _http_client(
         self, authenticated: bool = False
     ) -> AsyncIterator[httpx.AsyncClient]:
         """Get an HTTP client with authentication headers."""
-        headers = {"Content-Type": "application/json"}
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "*/*",
+            "User-Agent": "Frisquet Connect/2.5 (com.frisquetsa.connect; build:47; iOS 16.3.1) Alamofire/5.2.2",
+            "Accept-Language": "en-FR;q=1.0, fr-FR;q=0.9",
+        }
         params = {}
         if authenticated:
             token = await self.token
@@ -146,3 +194,23 @@ class FrisquetClient:
             event_hooks={"response": [raise_on_4xx_5xx]},
         ) as client:
             yield client  # Yield the client for use in the context
+
+
+def _temperature_key(zone: Zone, heating_mode: HeatingMode) -> str:
+    """Get the key for the temperature setting."""
+    return f"{HEATING_MODE_TO_STR[heating_mode]}_Z{zone.value}"
+
+
+def _mode_change_payload(zone: Zone, change: ModeChange, mode: Mode) -> tuple[str, int]:
+    """Get the key for the mode setting."""
+    if change == ModeChange.UNTIL_NEXT_CHANGE and mode == Mode.AUTO:
+        raise ValueError(
+            "Auto cannot be set until next change. Choose permanent instead."
+        )
+
+    key = (
+        "MODE_DERO"
+        if change == ModeChange.UNTIL_NEXT_CHANGE
+        else f"SELECTEUR_Z{zone.value}"
+    )
+    return key, MODE_TO_VALUE[mode]
