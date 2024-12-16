@@ -7,16 +7,23 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel
 from typing import AsyncIterator
 
-from frisquet_api.interface import FrisquetApiInterface, Zone, Mode, ModeChange, HeatingMode
+from frisquet_api.interface import (
+    FrisquetApiInterface,
+    Zone,
+    Mode,
+    ModeChange,
+    HeatingMode,
+    WaterMode,
+    WaterModeSimple,
+    SiteData,
+    Consumption,
+)
 
-MODE_TO_VALUE = {Mode.AUTO: 5, Mode.COMFORT: 6, Mode.ECO: 7, Mode.FROST_PROTECTION: 8}
-HEATING_MODE_TO_VALUE = {HeatingMode.COMFORT: 6, HeatingMode.ECO: 7, HeatingMode.FROST_PROTECTION: 8}
 HEATING_MODE_TO_STR = {
-    HeatingMode.COMFORT: "CONS_COMFORT",
+    HeatingMode.COMFORT: "CONS_CONF",
     HeatingMode.ECO: "CONS_RED",
     HeatingMode.FROST_PROTECTION: "CONS_HG",
 }
-SELECT_TO_VALUE = {ModeChange.UNTIL_NEXT_CHANGE: 5, ModeChange.PERMANENT: 6}
 
 
 class Token(BaseModel):
@@ -75,6 +82,11 @@ class FrisquetClient(FrisquetApiInterface):
         payload = {key: 1 if on else 0}
         await self._post_values(site_id, payload)
 
+    async def set_water_mode(self, site_id: str, water_mode: WaterMode | WaterModeSimple) -> None:
+        """Set water mode for a specific zone."""
+        payload = {"MODE_ECS": water_mode.value}
+        await self._post_values(site_id, payload)
+
     async def get_consumption_data(self, site_id: str, start_date: datetime, end_date: datetime) -> list[dict]:
         """Get consumption data for a date range"""
         ...
@@ -121,7 +133,7 @@ class FrisquetClient(FrisquetApiInterface):
 
         return self._sites
 
-    async def get_site_data(self, site_id: str) -> dict:
+    async def get_site_data(self, site_id: str) -> SiteData:
         """Get data for a specific site.
 
         Args:
@@ -136,11 +148,18 @@ class FrisquetClient(FrisquetApiInterface):
         async with self._http_client(authenticated=True) as client:
             resp = await client.get(f"/sites/{site_id}")
 
-        return resp.json()
+        return SiteData.model_validate(resp.json())
+
+    async def get_consumption(self, site_id: str) -> Consumption:
+        """Get consumption data for a specific site."""
+        async with self._http_client(authenticated=True) as client:
+            resp = await client.get(f"/sites/{site_id}/conso", params={"types[]": ["CHF", "SAN"]})
+
+        return Consumption.model_validate(resp.json())
 
     async def _post_values(self, site_id: str, values: dict) -> None:
         """Post values to Frisquet API."""
-        values_dict = [{"cle": key, "valeur": value} for key, value in values.items()]
+        values_dict = [{"cle": str(key), "valeur": str(value)} for key, value in values.items()]
         async with self._http_client(authenticated=True) as client:
             res = await client.post(f"/ordres/{site_id}", json=values_dict)  # noqa: F841
 
@@ -180,4 +199,4 @@ def _mode_change_payload(zone: Zone, change: ModeChange, mode: Mode) -> tuple[st
         raise ValueError("Auto cannot be set until next change. Choose permanent instead.")
 
     key = "MODE_DERO" if change == ModeChange.UNTIL_NEXT_CHANGE else f"SELECTEUR_Z{zone.value}"
-    return key, MODE_TO_VALUE[mode]
+    return key, mode.value

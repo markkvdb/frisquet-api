@@ -1,6 +1,7 @@
-from typing import Protocol, Dict, Any
-from datetime import datetime
+from typing import Protocol
 from enum import Enum
+
+from .raw_models import SiteData, Consumption
 
 
 class Zone(Enum):
@@ -14,25 +15,43 @@ class Zone(Enum):
 class ModeChange(Enum):
     """HVAC mode enum"""
 
-    PERMANENT = "permanent"
-    UNTIL_NEXT_CHANGE = "until_next_change"
+    PERMANENT = 6
+    UNTIL_NEXT_CHANGE = 5
 
 
 class HeatingMode(Enum):
     """Preset mode enum"""
 
-    COMFORT = "comfort"
-    ECO = "eco"
-    FROST_PROTECTION = "frost_protection"
+    COMFORT = 6
+    ECO = 7
+    FROST_PROTECTION = 8
+
+
+class WaterModeSimple(Enum):
+    """Water mode enum"""
+
+    ON = 5
+    OFF = 0
+
+
+class WaterMode(Enum):
+    """Water mode enum"""
+
+    MAX = 0
+    ECO = 1
+    ECO_TIMER = 2
+    ECO_PLUS = 3
+    ECO_PLUS_TIMER = 4
+    OFF = 5
 
 
 class Mode(Enum):
     """Mode enum"""
 
-    AUTO = "auto"
-    COMFORT = "comfort"
-    ECO = "eco"
-    FROST_PROTECTION = "frost_protection"
+    AUTO = 5
+    COMFORT = 6
+    ECO = 7
+    FROST_PROTECTION = 8
 
 
 class FrisquetApiInterface(Protocol):
@@ -50,14 +69,18 @@ class FrisquetApiInterface(Protocol):
         """Turn boost on and off."""
         ...
 
-    async def get_consumption_data(self, site_id: str, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
-        """Get consumption data for a date range"""
+    async def set_water_mode(self, site_id: str, water_mode: WaterMode | WaterModeSimple) -> None:
+        """Set water mode for a specific zone."""
+        ...
+
+    async def get_consumption(self, site_id: str) -> Consumption:
+        """Get consumption data for a specific site."""
         ...
 
     async def get_authentication(self) -> str:
         """Get authentication token"""
         ...
 
-    async def get_site_data(self, site_id: str) -> Dict[str, Any]:
+    async def get_site_data(self, site_id: str) -> SiteData:
         """Get data for a specific site"""
         ...

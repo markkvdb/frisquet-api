@@ -2,7 +2,7 @@ import os
 import pytest
 from dotenv import load_dotenv
 import httpx
-from frisquet_api.client import FrisquetClient, Zone, Mode, ModeChange, HeatingMode
+from frisquet_api.client import FrisquetClient, Zone, Mode, ModeChange, HeatingMode, WaterMode
 
 # Load environment variables from .env file
 load_dotenv()
@@ -41,3 +41,12 @@ async def test_set_temperature(client: FrisquetClient):
 
 async def test_set_mode(client: FrisquetClient):
     await client.set_mode("23425231180423", Zone.ZONE_1, ModeChange.UNTIL_NEXT_CHANGE, Mode.COMFORT)
+
+
+async def test_set_water_mode(client: FrisquetClient):
+    await client.set_water_mode("23425231180423", WaterMode.ECO_TIMER)
+
+
+async def test_get_consumption(client: FrisquetClient):
+    consumption = await client.get_consumption("23425231180423")
+    assert consumption is not None
