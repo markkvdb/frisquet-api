@@ -38,15 +38,11 @@ class Mode(Enum):
 class FrisquetApiInterface(Protocol):
     """Interface defining the Frisquet API contract"""
 
-    async def set_temperature(
-        self, site_id: str, zone: Zone, heating_mode: HeatingMode, temperature: float
-    ) -> None:
+    async def set_temperature(self, site_id: str, zone: Zone, heating_mode: HeatingMode, temperature: float) -> None:
         """Set temperature for a specific zone"""
         ...
 
-    async def set_mode(
-        self, site_id: str, zone: Zone, change: ModeChange, mode: Mode
-    ) -> None:
+    async def set_mode(self, site_id: str, zone: Zone, change: ModeChange, mode: Mode) -> None:
         """Set mode for a specific zone."""
         ...
 
@@ -54,9 +50,7 @@ class FrisquetApiInterface(Protocol):
         """Turn boost on and off."""
         ...
 
-    async def get_consumption_data(
-        self, site_id: str, start_date: datetime, end_date: datetime
-    ) -> Dict[str, Any]:
+    async def get_consumption_data(self, site_id: str, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
         """Get consumption data for a date range"""
         ...
 

@@ -7,20 +7,10 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel
 from typing import AsyncIterator
 
-from frisquet_api.interface import (
-    FrisquetApiInterface,
-    Zone,
-    Mode,
-    ModeChange,
-    HeatingMode,
-)
+from frisquet_api.interface import FrisquetApiInterface, Zone, Mode, ModeChange, HeatingMode
 
 MODE_TO_VALUE = {Mode.AUTO: 5, Mode.COMFORT: 6, Mode.ECO: 7, Mode.FROST_PROTECTION: 8}
-HEATING_MODE_TO_VALUE = {
-    HeatingMode.COMFORT: 6,
-    HeatingMode.ECO: 7,
-    HeatingMode.FROST_PROTECTION: 8,
-}
+HEATING_MODE_TO_VALUE = {HeatingMode.COMFORT: 6, HeatingMode.ECO: 7, HeatingMode.FROST_PROTECTION: 8}
 HEATING_MODE_TO_STR = {
     HeatingMode.COMFORT: "CONS_COMFORT",
     HeatingMode.ECO: "CONS_RED",
@@ -61,24 +51,18 @@ class FrisquetClient(FrisquetApiInterface):
         self._token: Token | None = None
         self._sites: dict[str, str] | None = None
 
-    async def set_temperature(
-        self, site_id: str, zone: Zone, heating_mode: HeatingMode, temperature: float
-    ) -> None:
+    async def set_temperature(self, site_id: str, zone: Zone, heating_mode: HeatingMode, temperature: float) -> None:
         """Set temperature for a specific zone"""
         key = _temperature_key(zone, heating_mode)
         int_temperature = int(temperature * 10)
         payload = {key: int_temperature}
         await self._post_values(site_id, payload)
 
-    async def set_mode(
-        self, site_id: str, zone: Zone, change: ModeChange, mode: Mode
-    ) -> None:
+    async def set_mode(self, site_id: str, zone: Zone, change: ModeChange, mode: Mode) -> None:
         """Set mode for a specific zone."""
         # If the mode is auto and the change is until next change, we need to set the mode to permanent
         if change == ModeChange.UNTIL_NEXT_CHANGE and mode == Mode.AUTO:
-            logger.warning(
-                "Auto mode cannot be set until next change. Setting to permanent instead."
-            )
+            logger.warning("Auto mode cannot be set until next change. Setting to permanent instead.")
             change = ModeChange.PERMANENT
 
         key, value = _mode_change_payload(zone, change, mode)
@@ -91,9 +75,7 @@ class FrisquetClient(FrisquetApiInterface):
         payload = {key: 1 if on else 0}
         await self._post_values(site_id, payload)
 
-    async def get_consumption_data(
-        self, site_id: str, start_date: datetime, end_date: datetime
-    ) -> list[dict]:
+    async def get_consumption_data(self, site_id: str, start_date: datetime, end_date: datetime) -> list[dict]:
         """Get consumption data for a date range"""
         ...
 
@@ -113,13 +95,8 @@ class FrisquetClient(FrisquetApiInterface):
         """Initialise with token and site data."""
         auth_data = await self.get_authentication()
 
-        self._token = Token(
-            token=auth_data["token"], expires_at=datetime.now() + timedelta(hours=1)
-        )
-        self._sites = {
-            site["identifiant_chaudiere"]: site["nom"]
-            for site in auth_data["utilisateur"]["sites"]
-        }
+        self._token = Token(token=auth_data["token"], expires_at=datetime.now() + timedelta(hours=1))
+        self._sites = {site["identifiant_chaudiere"]: site["nom"] for site in auth_data["utilisateur"]["sites"]}
 
     async def get_authentication(self) -> dict:
         """Get authentication token from Frisquet API."""
@@ -132,9 +109,7 @@ class FrisquetClient(FrisquetApiInterface):
         }
 
         async with self._http_client(authenticated=False) as client:
-            resp = await client.post(
-                "/authentifications", headers=headers, json=auth_data
-            )
+            resp = await client.post("/authentifications", headers=headers, json=auth_data)
 
             return resp.json()
 
@@ -172,9 +147,7 @@ class FrisquetClient(FrisquetApiInterface):
         logger.info(f"Set values {values} for site {site_id}")
 
     @asynccontextmanager
-    async def _http_client(
-        self, authenticated: bool = False
-    ) -> AsyncIterator[httpx.AsyncClient]:
+    async def _http_client(self, authenticated: bool = False) -> AsyncIterator[httpx.AsyncClient]:
         """Get an HTTP client with authentication headers."""
         headers = {
             "Content-Type": "application/json",
@@ -204,13 +177,7 @@ def _temperature_key(zone: Zone, heating_mode: HeatingMode) -> str:
 def _mode_change_payload(zone: Zone, change: ModeChange, mode: Mode) -> tuple[str, int]:
     """Get the key for the mode setting."""
     if change == ModeChange.UNTIL_NEXT_CHANGE and mode == Mode.AUTO:
-        raise ValueError(
-            "Auto cannot be set until next change. Choose permanent instead."
-        )
+        raise ValueError("Auto cannot be set until next change. Choose permanent instead.")
 
-    key = (
-        "MODE_DERO"
-        if change == ModeChange.UNTIL_NEXT_CHANGE
-        else f"SELECTEUR_Z{zone.value}"
-    )
+    key = "MODE_DERO" if change == ModeChange.UNTIL_NEXT_CHANGE else f"SELECTEUR_Z{zone.value}"
     return key, MODE_TO_VALUE[mode]
