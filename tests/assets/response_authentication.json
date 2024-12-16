@@ -1,0 +1,26 @@
+{
+    "token": "c706213a7f7613db5b44bb49b4064742",
+    "utilisateur": {
+        "id": 1000,
+        "email": "test@test.com",
+        "civilite": "MR",
+        "nom": "DuPont",
+        "prenom": "Jean",
+        "rue": "123 Rue de la Paix",
+        "code_postal": "75000",
+        "ville": "Paris",
+        "code_pays": "FR",
+        "telephone": "0606060606",
+        "langue": "EN",
+        "acceptation_cgu_mobile": true,
+        "sites_pre_associes": [],
+        "notifications": true,
+        "sites": [
+            {
+                "identifiant_chaudiere": "24904092859",
+                "nom": "Maison",
+                "alarmes": []
+            }
+        ]
+    }
+}
